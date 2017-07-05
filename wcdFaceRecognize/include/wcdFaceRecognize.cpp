@@ -70,7 +70,7 @@ bool YV12toBGR(unsigned char *pYV12, unsigned char *pBGR24, int width, int heigh
 }
 
 //DLL初始化
-bool __stdcall FR_Init(FR_FaceDetectCallBack FFCB, FR_FaceVerifyCallBack MFCB,const string& path)
+bool __stdcall FR_Init(FR_FaceDetectCallBack FFCB, FR_FaceVerifyCallBack MFCB,const string& path)//有改动
 {
 	g_pFaceDetectFunc = FFCB;
 	g_pFaceVerifyFunc = MFCB;
@@ -159,7 +159,7 @@ int __stdcall FR_FaceDetect(BYTE* AFrame, int PhotoLen, int UserData, int flag)
 	vector<uchar> detect_face;
 	imencode(".bmp", MImageBGR(face_rect), detect_face);
 	int length = (int)detect_face.size();
-	char* guid = "guid";
+	char* guid = FR_CreateGUID(PhotoLen);
 	if (g_pFaceDetectFunc)
 	{
 		(*g_pFaceDetectFunc)(guid, &detect_face[0], length*sizeof(uchar), face_rect.x, face_rect.y, face_rect.width, face_rect.height, UserData);
@@ -206,7 +206,7 @@ int __stdcall FR_FaceListVerify(BYTE* FacePhoto, int FacePhotoLen, char* VTGUID,
 	vector<vector<float> > features = LoadFaceMatrix(name);
 	cout << features.size() << endl;
 
-	 char *FaceGUID = "guid";
+	 char *FaceGUID = FR_CreateGUID(FacePhotoLen);
 
 	int id=-1;
 	float max = 0;
@@ -222,15 +222,14 @@ int __stdcall FR_FaceListVerify(BYTE* FacePhoto, int FacePhotoLen, char* VTGUID,
 				id = i+1;
 			}
 
-		    char *MatchGUID=(char*)malloc(1);
-			MatchGUID[0] = '0' + i;
+		    char *MatchGUID=FR_CreateGUID(i);
 			string path = string(head_path + "\\registerimg\\") + to_string(i) + ".bmp";
 			Mat face = imread(path);
 			vector<uchar> v;
 			imencode(".bmp", face, v);
 			int length = (int)v.size();
 			if (g_pFaceVerifyFunc)
-				(*g_pFaceVerifyFunc)(FaceGUID, const_cast<char*>(MatchGUID), &v[0], length*sizeof(uchar), (int)(rate * 100), UserData);
+				(*g_pFaceVerifyFunc)(FaceGUID, MatchGUID, &v[0], length*sizeof(uchar), (int)(rate * 100), UserData);
 		}
 		
 	}
@@ -247,6 +246,13 @@ bool __stdcall FR_Test()
 void __stdcall FR_Caffe_init(const string& prototxt, const string& caffemodel)
 {
 	Caffe_Predefine(prototxt, caffemodel);
+}
+
+char* __stdcall  FR_CreateGUID(int guid)
+{
+	char GUID[10] = { 0 };
+	_itoa_s(guid, GUID, 10);
+	return GUID;
 }
 
 vector<float>  ExtractFeature_(Mat iptImage)

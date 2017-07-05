@@ -66,5 +66,7 @@ DLL_API bool __stdcall FR_Test();
 //³õÊ¼»¯caffe¿ò¼Ü
 DLL_API void __stdcall FR_Caffe_init(const string& prototxt, const string& caffemodel);
 
+DLL_API char* __stdcall  FR_CreateGUID(int guid);
+
 
 #endif
