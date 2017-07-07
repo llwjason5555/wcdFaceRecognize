@@ -4,6 +4,8 @@
 FR_FaceDetectCallBack g_pFaceDetectFunc = NULL;
 FR_FaceVerifyCallBack g_pFaceVerifyFunc = NULL;
 string head_path;
+vector<string> name;
+vector<vector<float> > features;
 
 static const int Table_fv1[256] = { -180, -179, -177, -176, -174, -173, -172, -170, -169, -167, -166, -165, -163, -162, -160, -159, -158, -156, -155, -153, -152, -151, -149, -148, -146, -145, -144, -142, -141, -139, -138, -137, -135, -134, -132, -131, -130, -128, -127, -125, -124, -123, -121, -120, -118, -117, -115, -114, -113, -111, -110, -108, -107, -106, -104, -103, -101, -100, -99, -97, -96, -94, -93, -92, -90, -89, -87, -86, -85, -83, -82, -80, -79, -78, -76, -75, -73, -72, -71, -69, -68, -66, -65, -64, -62, -61, -59, -58, -57, -55, -54, -52, -51, -50, -48, -47, -45, -44, -43, -41, -40, -38, -37, -36, -34, -33, -31, -30, -29, -27, -26, -24, -23, -22, -20, -19, -17, -16, -15, -13, -12, -10, -9, -8, -6, -5, -3, -2, 0, 1, 2, 4, 5, 7, 8, 9, 11, 12, 14, 15, 16, 18, 19, 21, 22, 23, 25, 26, 28, 29, 30, 32, 33, 35, 36, 37, 39, 40, 42, 43, 44, 46, 47, 49, 50, 51, 53, 54, 56, 57, 58, 60, 61, 63, 64, 65, 67, 68, 70, 71, 72, 74, 75, 77, 78, 79, 81, 82, 84, 85, 86, 88, 89, 91, 92, 93, 95, 96, 98, 99, 100, 102, 103, 105, 106, 107, 109, 110, 112, 113, 114, 116, 117, 119, 120, 122, 123, 124, 126, 127, 129, 130, 131, 133, 134, 136, 137, 138, 140, 141, 143, 144, 145, 147, 148, 150, 151, 152, 154, 155, 157, 158, 159, 161, 162, 164, 165, 166, 168, 169, 171, 172, 173, 175, 176, 178 };
 static const int Table_fv2[256] = { -92, -91, -91, -90, -89, -88, -88, -87, -86, -86, -85, -84, -83, -83, -82, -81, -81, -80, -79, -78, -78, -77, -76, -76, -75, -74, -73, -73, -72, -71, -71, -70, -69, -68, -68, -67, -66, -66, -65, -64, -63, -63, -62, -61, -61, -60, -59, -58, -58, -57, -56, -56, -55, -54, -53, -53, -52, -51, -51, -50, -49, -48, -48, -47, -46, -46, -45, -44, -43, -43, -42, -41, -41, -40, -39, -38, -38, -37, -36, -36, -35, -34, -33, -33, -32, -31, -31, -30, -29, -28, -28, -27, -26, -26, -25, -24, -23, -23, -22, -21, -21, -20, -19, -18, -18, -17, -16, -16, -15, -14, -13, -13, -12, -11, -11, -10, -9, -8, -8, -7, -6, -6, -5, -4, -3, -3, -2, -1, 0, 0, 1, 2, 2, 3, 4, 5, 5, 6, 7, 7, 8, 9, 10, 10, 11, 12, 12, 13, 14, 15, 15, 16, 17, 17, 18, 19, 20, 20, 21, 22, 22, 23, 24, 25, 25, 26, 27, 27, 28, 29, 30, 30, 31, 32, 32, 33, 34, 35, 35, 36, 37, 37, 38, 39, 40, 40, 41, 42, 42, 43, 44, 45, 45, 46, 47, 47, 48, 49, 50, 50, 51, 52, 52, 53, 54, 55, 55, 56, 57, 57, 58, 59, 60, 60, 61, 62, 62, 63, 64, 65, 65, 66, 67, 67, 68, 69, 70, 70, 71, 72, 72, 73, 74, 75, 75, 76, 77, 77, 78, 79, 80, 80, 81, 82, 82, 83, 84, 85, 85, 86, 87, 87, 88, 89, 90, 90 };
@@ -75,6 +77,8 @@ bool __stdcall FR_Init(FR_FaceDetectCallBack FFCB, FR_FaceVerifyCallBack MFCB,co
 	g_pFaceDetectFunc = FFCB;
 	g_pFaceVerifyFunc = MFCB;
 	head_path = path;
+	name = LoadName(head_path + "\\data\\Name.txt");
+	features = LoadFaceMatrix(name);
 	return true;
 }
 
@@ -86,13 +90,19 @@ bool __stdcall FR_Final()
 	return true;
 }
 
-int __stdcall FR_AddVerifyTarget(char* VTGUID, BYTE* VTPhoto, int VTPhotoLen)
+int __stdcall FR_AddVerifyTarget(const char* VTGUID, BYTE* VTPhoto, int VTPhotoLen)
 {
 	Mat bufImage(1, VTPhotoLen, CV_8UC1);
 	memcpy(bufImage.data, VTPhoto, VTPhotoLen);
 	Mat MImageBGR = imdecode(bufImage, CV_LOAD_IMAGE_COLOR);//BMP解码
 
-	Mat detect_face = FaceDetect_(MImageBGR);
+	if (MImageBGR.empty())
+	{
+		cout << "Input image is empty(Fuc FR_AddVerifyTarget)" << endl;
+		return -1;
+	}
+
+	Mat detect_face = FaceDetect_(MImageBGR,0,0);
 	vector<float> feature = ExtractFeature_(detect_face);
 
 	string name(VTGUID);
@@ -102,8 +112,13 @@ int __stdcall FR_AddVerifyTarget(char* VTGUID, BYTE* VTPhoto, int VTPhotoLen)
 	return true;
 }
 
-int __stdcall FR_DelVerifyTarget(char* VTGUID)
+int __stdcall FR_DelVerifyTarget(const char* VTGUID)
 {
+	if (!VTGUID)
+	{
+		cout << "GUID is empty(Func FR_DelVerifyTarget)" << endl;
+		return -1;
+	}
 	string name(VTGUID);
 	ifstream in(head_path+"\\data\\Name.txt");
 
@@ -147,23 +162,38 @@ int __stdcall FR_FaceDetect(BYTE* AFrame, int PhotoLen, int UserData, int flag)
 	Mat bufImage(1, PhotoLen, CV_8UC1, AFrame);
 	Mat MImageBGR = imdecode(bufImage, CV_LOAD_IMAGE_COLOR);//BMP解码
 
-	if (flag == SHOW_IMAGE)
+	if (MImageBGR.empty())
+	{
+		cout << "Input image is empty(Fuc FR_FaceDetect)" << endl;
+		return -1;
+	}
+
+	/*if (flag == SHOW_IMAGE)
 	{
 		Mat MTest = Mat::zeros(100, 100, CV_8UC1);
 		imshow("FaceDetect_MImageBGR", MImageBGR);
 		imshow("MTest", MTest);
 		waitKey(20);
-	}
+	}*/
 
-	Rect face_rect = FaceDetect_(MImageBGR, 0);
-	vector<uchar> detect_face;
-	imencode(".bmp", MImageBGR(face_rect), detect_face);
-	int length = (int)detect_face.size();
-	char* guid = FR_CreateGUID(PhotoLen);
-	if (g_pFaceDetectFunc)
+	vector<Rect> face_rect = FaceDetect_(MImageBGR, 0);
+	if (face_rect.size() == 0)
 	{
-		(*g_pFaceDetectFunc)(guid, &detect_face[0], length*sizeof(uchar), face_rect.x, face_rect.y, face_rect.width, face_rect.height, UserData);
+		cout << "Can't detect face!(Func FR_FaceDetect)" << endl;
+		return -1;
 	}
+	vector<uchar> detect_face;
+	int length;
+	for (int i = 0; i < face_rect.size(); i++)
+	{
+		imencode(".bmp", MImageBGR(face_rect[i]), detect_face);
+		length = (int)detect_face.size();
+		if (g_pFaceDetectFunc)
+		{
+			(*g_pFaceDetectFunc)(to_string(i).c_str(), &detect_face[0], length*sizeof(uchar), face_rect[i].x, face_rect[i].y, face_rect[i].width, face_rect[i].height, UserData);
+		}
+	}
+	
 	return true;
 
 
@@ -171,6 +201,31 @@ int __stdcall FR_FaceDetect(BYTE* AFrame, int PhotoLen, int UserData, int flag)
 
 int __stdcall FR_FaceDetectSingle(BYTE* AFrame, int PhotoLen, BYTE* &AFace, int &FaceLen)
 {
+	Mat bufImage(1, PhotoLen, CV_8UC1, AFrame);
+	Mat MImageBGR = imdecode(bufImage, CV_LOAD_IMAGE_COLOR);//BMP解码
+
+	if (MImageBGR.empty())
+	{
+		cout << "Input image is empty(Fuc FR_FaceDetectSingle)" << endl;
+		return -1;
+	}
+
+
+	Mat face_rect = FaceDetect_(MImageBGR, 0, 0);
+	if (face_rect.empty())
+	{
+		cout << "Can't detect face!(Func FR_FaceDetectSingle)" << endl;
+		return -1;
+	}
+	vector<uchar> detect_face;
+	int length=0;
+	
+	imencode(".bmp", face_rect, detect_face);
+	length = (int)detect_face.size();
+
+	AFace = &detect_face[0];
+	FaceLen = length;
+	
 	return true;
 }
 
@@ -180,62 +235,168 @@ int __stdcall FR_FaceVerify(BYTE* FaceAPhoto, int FaceAPhotoLen, BYTE* FaceBPhot
 	memcpy(bufImageA.data, FaceAPhoto, FaceAPhotoLen);
 	Mat MImageBGR_A = imdecode(bufImageA, CV_LOAD_IMAGE_COLOR);//BMP解码
 
+	if (MImageBGR_A.empty())
+	{
+		cout << "Input A image is empty(Fuc FR_FaceVerify)" << endl;
+		return -1;
+	}
+
 	Mat bufImageB(1, FaceBPhotoLen, CV_8UC1);
 	memcpy(bufImageB.data, FaceBPhoto, FaceBPhotoLen);
 	Mat MImageBGR_B = imdecode(bufImageB, CV_LOAD_IMAGE_COLOR);//BMP解码
 
-	Mat detect_faceA = FaceDetect_(MImageBGR_A);
-	Mat detect_faceB = FaceDetect_(MImageBGR_B);
+	if (MImageBGR_A.empty())
+	{
+		cout << "Input B image is empty(Fuc FR_FaceVerify)" << endl;
+		return -1;
+	}
+
+	Mat detect_faceA = FaceDetect_(MImageBGR_A,0,0);
+
+	if (detect_faceA.empty())
+	{
+		cout << "A image has no face(Func FR_FaceVerify)" << endl;
+		return -1;
+	}
+
+	Mat detect_faceB = FaceDetect_(MImageBGR_B,0,0);
+
+	if (detect_faceA.empty())
+	{
+		cout << "B image has no face(Func FR_FaceVerify)" << endl;
+		return -1;
+	}
+
+
 	vector<float> featureA = ExtractFeature_(detect_faceA);
 	vector<float> featureB = ExtractFeature_(detect_faceB);
 	int rate =(int) (100 *cosine(featureA, featureB));
 	return rate;
 }
 
-int __stdcall FR_FaceListVerify(BYTE* FacePhoto, int FacePhotoLen, char* VTGUID, int UserData)
+int __stdcall FR_FaceListVerify(BYTE* FacePhoto, int FacePhotoLen, char* VTGUID, int UserData) //VTGUID malloc >10
 {
 	Mat bufImage(1, FacePhotoLen, CV_8UC1);
 	memcpy(bufImage.data, FacePhoto, FacePhotoLen);
 	Mat MImageBGR = imdecode(bufImage, CV_LOAD_IMAGE_COLOR);//BMP解码
 
-	Mat detect_face = FaceDetect_(MImageBGR);
+	if (MImageBGR.empty())
+	{
+		cout << "Input image is empty(Fuc FR_FaceListVerify)" << endl;
+		return -1;
+	}
+
+	Mat detect_face = FaceDetect_(MImageBGR,0,0);
+
+	if (detect_face.empty())
+	{
+		cout << "image has no face(Func FR_FaceListVerify)" << endl;
+		return -1;
+	}
+
 	vector<float> feature = ExtractFeature_(detect_face);
 
-	vector<string> name = LoadName(head_path + "\\data\\Name.txt");
-	cout << name.size() << endl;
-	vector<vector<float> > features = LoadFaceMatrix(name);
-	cout << features.size() << endl;
+	/*vector<string> name = LoadName(head_path + "\\data\\Name.txt");
+	vector<vector<float> > features = LoadFaceMatrix(name);*/
 
 	 char *FaceGUID = FR_CreateGUID(FacePhotoLen);
 
 	int id=-1;
 	float max = 0;
 
-	for (int i = 0; i < features.size(); i++)
+	for (int i = 1; i < features.size()+1; i++)
 	{
-		float rate = cosine(feature, features[i]);
+		float rate = cosine(feature, features[i-1]);
 		if (rate > 0.8)
 		{
 			if (rate > max)
 			{
 				max = rate;
-				id = i+1;
+				id = i;
 			}
 
-		    char *MatchGUID=FR_CreateGUID(i);
 			string path = string(head_path + "\\registerimg\\") + to_string(i) + ".bmp";
 			Mat face = imread(path);
 			vector<uchar> v;
 			imencode(".bmp", face, v);
 			int length = (int)v.size();
 			if (g_pFaceVerifyFunc)
-				(*g_pFaceVerifyFunc)(FaceGUID, MatchGUID, &v[0], length*sizeof(uchar), (int)(rate * 100), UserData);
+				(*g_pFaceVerifyFunc)(FaceGUID, to_string(id).c_str(), &v[0], length*sizeof(uchar), (int)(rate * 100), UserData);
 		}
 		
 	}
-
+	//VTGUID = FR_CreateGUID(id);
+	if (id == 0)
+		cout << "no recognized face!" << endl;
 	return id;
 
+}
+
+int __stdcall FR_Multi_FaceListVerify(BYTE* FacePhoto, int FacePhotoLen, char* VTGUID, int UserData)
+{
+	Mat bufImage(1, FacePhotoLen, CV_8UC1);
+	memcpy(bufImage.data, FacePhoto, FacePhotoLen);
+	Mat MImageBGR = imdecode(bufImage, CV_LOAD_IMAGE_COLOR);//BMP解码
+
+	if (MImageBGR.empty())
+	{
+		cout << "Input image is empty1(Fuc FR_FaceListVerify)" << endl;
+		return -1;
+	}
+
+	vector<Mat> detect_face = FaceDetect_(MImageBGR);
+
+	if (detect_face.empty())
+	{
+		cout << "image has no face1(Func FR_FaceListVerify)" << endl;
+		return -1;
+	}
+
+	vector<float> feature;
+	int id = 0;
+	float max = 0;
+
+	for (int j = 0; j < detect_face.size(); j++)
+	{
+		feature = ExtractFeature_(detect_face[j]);
+
+		/*vector<string> name = LoadName(head_path + "\\data\\Name.txt");
+		vector<vector<float> > features = LoadFaceMatrix(name);*/
+
+		//char *FaceGUID = FR_CreateGUID(FacePhotoLen);
+
+		id = 0;
+		max = 0;
+
+		for (int i = 1; i < features.size() + 1; i++)
+		{
+			float rate = cosine(feature, features[i - 1]);
+			if (rate > 0.8)
+			{
+				if (rate > max)
+				{
+					max = rate;
+					id = i;
+				}
+
+				//char *MatchGUID = FR_CreateGUID(i);
+				string path = string(head_path + "\\registerimg\\") + to_string(i) + ".bmp";
+				Mat face = imread(path);
+				vector<uchar> v;
+				imencode(".bmp", face, v);
+				int length = (int)v.size();
+				if (g_pFaceVerifyFunc)
+					(*g_pFaceVerifyFunc)(to_string(j).c_str(), to_string(id).c_str(), &v[0], length*sizeof(uchar), (int)(rate * 100), UserData);
+			}
+
+		}
+
+		if (id == 0)
+			cout << "num " << j <<" : "<< "no recognized face!" << endl;
+	}
+	
+	//VTGUID = FR_CreateGUID(id);
+	return true;
 }
 
 bool __stdcall FR_Test()
@@ -248,7 +409,7 @@ void __stdcall FR_Caffe_init(const string& prototxt, const string& caffemodel)
 	Caffe_Predefine(prototxt, caffemodel);
 }
 
-char* __stdcall  FR_CreateGUID(int guid)
+char*  FR_CreateGUID(int guid)
 {
 	char GUID[10] = { 0 };
 	_itoa_s(guid, GUID, 10);
@@ -266,9 +427,10 @@ vector<float>  ExtractFeature_(Mat iptImage)
 	return feature;
 }
 
-Mat FaceDetect_(Mat iptImage)
+vector<Mat> FaceDetect_(Mat iptImage)
 {
-	Mat gray;
+	Mat gray, mat;
+	vector<Mat> faces;
 	cvtColor(iptImage, gray, CV_BGR2GRAY);
 
 	int doLandmark = 1;
@@ -279,20 +441,32 @@ Mat FaceDetect_(Mat iptImage)
 	
 	int p_num = (pResults ? *pResults : 0);
 
+	if (p_num == 0)
+	{
+		cout << "No face(Func FaceDetect_)" << endl;
+		return faces;
+	}
 
-	short * p = ((short*)(pResults + 1));
-	Point left(p[0], p[1]);
-	Point right(p[0] + p[2], p[1] + p[3]);
-	Rect rect = Rect(left, right);
-	Mat mat;
-	mat = iptImage(rect);
-	resize(mat, mat, Size(224, 224));
-	return mat;
+	for (int i = 0; i < (pResults ? *pResults : 0); i++)
+	{
+		short * p = ((short*)(pResults + 1))+142*i;
+		Point left(p[0], p[1]);
+		Point right(p[0] + p[2], p[1] + p[3]);
+		Rect rect = Rect(left, right);
+
+		mat = iptImage(rect);
+		resize(mat, mat, Size(224, 224));
+		faces.push_back(mat);
+	}
+	
+	return faces;
 }
 
-Rect FaceDetect_(Mat iptImage, int flag)
+vector<Rect> FaceDetect_(Mat iptImage, int flag)
 {
 	Mat gray;
+	Rect rect;
+	vector<Rect> face_rect;
 	cvtColor(iptImage, gray, CV_BGR2GRAY);
 
 	int doLandmark = 1;
@@ -303,12 +477,51 @@ Rect FaceDetect_(Mat iptImage, int flag)
 
 	int p_num = (pResults ? *pResults : 0);
 
+	if (p_num == 0)
+	{
+		cout << "No face1(Func FaceDetect_)" << endl;
+		return face_rect;
+	}
 
-	short * p = ((short*)(pResults + 1));
+	for (int i = 0; i < (pResults ? *pResults : 0); i++)
+	{
+		short * p = ((short*)(pResults + 1))+142*i;
+		Point left(p[0], p[1]);
+		Point right(p[0] + p[2], p[1] + p[3]);
+		rect = Rect(left, right);
+		face_rect.push_back(rect);
+	}
+	return face_rect;
+}
+
+Mat FaceDetect_(Mat iptImage,int flag,int flags)
+{
+	Mat gray, mat;
+	cvtColor(iptImage, gray, CV_BGR2GRAY);
+
+	int doLandmark = 1;
+	int * pResults = NULL;
+	unsigned char * pBuffer = (unsigned char *)malloc(DETECT_BUFFER_SIZE);
+	pResults = facedetect_multiview_reinforce(pBuffer, (unsigned char*)(gray.ptr(0)), gray.cols, gray.rows, (int)gray.step,
+		1.2f, 3, 48, 0, doLandmark);
+
+	int p_num = (pResults ? *pResults : 0);
+
+	if (p_num == 0)
+	{
+		cout << "No face2(Func FaceDetect_)" << endl;
+		return mat;
+	}
+	
+	short * p = ((short*)(pResults + 1)) ;
 	Point left(p[0], p[1]);
 	Point right(p[0] + p[2], p[1] + p[3]);
 	Rect rect = Rect(left, right);
-	return rect;
+
+	mat = iptImage(rect);
+	resize(mat, mat, Size(224, 224));
+	
+	return mat;
 }
 
 Mat Vector2dToMat(vector<float> feature)
