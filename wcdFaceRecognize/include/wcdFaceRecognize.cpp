@@ -103,7 +103,21 @@ int __stdcall FR_AddVerifyTarget(const char* VTGUID, BYTE* VTPhoto, int VTPhotoL
 	}
 
 	Mat detect_face = FaceDetect_(MImageBGR,0,0);
-	vector<float> feature = ExtractFeature_(detect_face);
+
+	if (detect_face.empty())
+	{
+		cout << "Detect no face!(Func FR_AddVerifyTarget)" << endl;
+		return -1;
+	}
+
+	vector<float> feature;
+	feature = ExtractFeature_(detect_face);
+
+	if (feature.size() == 0)
+	{
+		cout << "Can't get features!(Func FR_AddVerifyTarget)" << endl;
+		return -1;
+	}
 
 	string name(VTGUID);
 	Mat saveFeature = Vector2dToMat(feature);
@@ -132,13 +146,20 @@ int __stdcall FR_DelVerifyTarget(const char* VTGUID)
 	vector<string> name_;
 	while (getline(in, s))
 		name_.push_back(s);
-	for (auto it = name_.begin(); it != name_.end(); ++it)
+	vector<string>::iterator it;
+	for (it = name_.begin(); it != name_.end(); ++it)
 	{
 		if (*it == name)
 		{
 			name_.erase(it);
 			break;
 		}
+	}
+
+	if (it == name_.end())
+	{
+		cout << "GUID doesn't exist!(Func FR_DelVerifyTarget)" << endl;
+		return -1;
 	}
 	in.close();
 
@@ -293,41 +314,48 @@ int __stdcall FR_FaceListVerify(BYTE* FacePhoto, int FacePhotoLen, char* VTGUID,
 		cout << "image has no face(Func FR_FaceListVerify)" << endl;
 		return -1;
 	}
-
+	clock_t t3, t4;
+	t3 = clock();
 	vector<float> feature = ExtractFeature_(detect_face);
+	t4 = clock();
+	cout << t4 - t3 << endl;
 
 	/*vector<string> name = LoadName(head_path + "\\data\\Name.txt");
 	vector<vector<float> > features = LoadFaceMatrix(name);*/
 
 	 char *FaceGUID = FR_CreateGUID(FacePhotoLen);
 
-	int id=-1;
+	int id=0;
 	float max = 0;
 
 	for (int i = 1; i < features.size()+1; i++)
 	{
 		float rate = cosine(feature, features[i-1]);
-		if (rate > 0.8)
+		if (rate > 0.90)
 		{
 			if (rate > max)
 			{
 				max = rate;
-				id = i;
+				id = stoi(name[i-1]);
 			}
 
-			string path = string(head_path + "\\registerimg\\") + to_string(i) + ".bmp";
-			Mat face = imread(path);
-			vector<uchar> v;
-			imencode(".bmp", face, v);
-			int length = (int)v.size();
-			if (g_pFaceVerifyFunc)
-				(*g_pFaceVerifyFunc)(FaceGUID, to_string(id).c_str(), &v[0], length*sizeof(uchar), (int)(rate * 100), UserData);
+			
 		}
 		
 	}
 	//VTGUID = FR_CreateGUID(id);
 	if (id == 0)
 		cout << "no recognized face!" << endl;
+	else
+	{
+		string path = string(head_path + "\\registerimg\\") + to_string(id) + ".bmp";
+		Mat face = imread(path);
+		vector<uchar> v;
+		imencode(".bmp", face, v);
+		int length = (int)v.size();
+		if (g_pFaceVerifyFunc)
+			(*g_pFaceVerifyFunc)(FaceGUID, to_string(id).c_str(), &v[0], length*sizeof(uchar), (int)(max * 100), UserData);
+	}
 	return id;
 
 }
@@ -371,28 +399,32 @@ int __stdcall FR_Multi_FaceListVerify(BYTE* FacePhoto, int FacePhotoLen, char* V
 		for (int i = 1; i < features.size() + 1; i++)
 		{
 			float rate = cosine(feature, features[i - 1]);
-			if (rate > 0.8)
+			if (rate > 0.90)
 			{
 				if (rate > max)
 				{
 					max = rate;
-					id = i;
+					id = stoi(name[i-1]);
 				}
 
 				//char *MatchGUID = FR_CreateGUID(i);
-				string path = string(head_path + "\\registerimg\\") + to_string(i) + ".bmp";
-				Mat face = imread(path);
-				vector<uchar> v;
-				imencode(".bmp", face, v);
-				int length = (int)v.size();
-				if (g_pFaceVerifyFunc)
-					(*g_pFaceVerifyFunc)(to_string(j).c_str(), to_string(id).c_str(), &v[0], length*sizeof(uchar), (int)(rate * 100), UserData);
+				
 			}
 
 		}
 
 		if (id == 0)
 			cout << "num " << j <<" : "<< "no recognized face!" << endl;
+		else
+		{
+			string path = string(head_path + "\\registerimg\\") + to_string(id) + ".bmp";
+			Mat face = imread(path);
+			vector<uchar> v;
+			imencode(".bmp", face, v);
+			int length = (int)v.size();
+			if (g_pFaceVerifyFunc)
+				(*g_pFaceVerifyFunc)(to_string(j).c_str(), to_string(id).c_str(), &v[0], length*sizeof(uchar), (int)(max * 100), UserData);
+		}
 	}
 	
 	//VTGUID = FR_CreateGUID(id);
@@ -419,11 +451,12 @@ char*  FR_CreateGUID(int guid)
 vector<float>  ExtractFeature_(Mat iptImage)
 {
 	vector<float> feature = ExtractFeature(iptImage);
-	for (int i = 0; i < feature.size(); i++)
+	//cout << feature.size() << endl;
+	/*for (int i = 0; i < feature.size(); i++)
 	{
 		if (feature[i]>100)
 			feature[i] = 0;
-	}
+	}*/
 	return feature;
 }
 
@@ -526,7 +559,7 @@ Mat FaceDetect_(Mat iptImage,int flag,int flags)
 
 Mat Vector2dToMat(vector<float> feature)
 {
-	Mat T(1, 2622, CV_32F);
+	Mat T(1, 4096, CV_32F);
 
 	for (int i=0; i < feature.size(); i++)
 	{
@@ -625,5 +658,10 @@ vector<vector<float> > LoadFaceMatrix(vector<string> NameVector)
 		features.push_back(feature);
 
 	}
+	return features;
+}
+
+vector<vector<float> >  get_vector()
+{
 	return features;
 }

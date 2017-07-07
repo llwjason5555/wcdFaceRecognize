@@ -14,9 +14,11 @@ using namespace cv;
 
 vector<float> ExtractFeature_(Mat iptImage);
 
-Mat FaceDetect_(Mat iptImage);
+vector<Mat> FaceDetect_(Mat iptImage);//多人脸检测
 
-Rect FaceDetect_(Mat iptImage, int flag);
+vector<Rect> FaceDetect_(Mat iptImage, int flag);//多人脸检测
+
+Mat FaceDetect_(Mat iptImage, int flag, int flags);//单人脸检测
 
 Mat Vector2dToMat(vector<float> feature);
 
@@ -37,6 +39,10 @@ Mat LoadMat(const string& file);//文件名
 vector<float> Mat2vector(Mat &FaceMatrix_mat);
 
 vector<vector<float> > LoadFaceMatrix(vector<string> NameVector);
+
+char*  FR_CreateGUID(int guid);
+
+vector<vector<float> >  get_vector();
 
 
 #endif

@@ -11,6 +11,7 @@
 #include <fstream>
 #include <stdio.h>
 #include <assert.h>
+#include <time.h>
 
 #include <opencv2/core/core.hpp>  
 #include <opencv2/highgui/highgui.hpp>  
@@ -33,6 +34,7 @@ enum
 	HIDE_IMAGE = 0,
 	SHOW_IMAGE = 1
 };
+
 
 
 //每发现一个单独的人脸生成一个对应的FaceGUID
